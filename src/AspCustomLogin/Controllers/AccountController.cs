@@ -21,7 +21,6 @@ namespace AspCustomLogin.Controllers
         [ValidateAntiForgeryToken]
         public IActionResult Login(User user)
         {
-            var hashedPassword = _login.HashPassword(user.PasswordHash, _login.Salt);
             var loginStatus = _login.Login(user.Username, user.PasswordHash);
 
             if (loginStatus.Item1 <= 0 || !(loginStatus.Item2))
