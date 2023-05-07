@@ -7,6 +7,7 @@ namespace AspCustomLogin.Services
     {
         // Pass your IUnitOfWork here, if any.
         private readonly IUnitOfWork _uow;
+        public byte[] Salt = new byte[16];
 
         public LoginHandler(IUnitOfWork uow)
         {
@@ -18,6 +19,8 @@ namespace AspCustomLogin.Services
             if (String.IsNullOrEmpty(username) || String.IsNullOrEmpty(password))
                 return (0, false, "");
 
+            password = ToBase(password);
+
             var user = _uow.Logins.GetAll(u => u.Username == username).FirstOrDefault();
             if (user == null) return (0, false, "");
 
@@ -25,29 +28,36 @@ namespace AspCustomLogin.Services
             if (IsBanned(user.UserId))
                 return (0, false, "");
 
+            new RNGCryptoServiceProvider().GetBytes(Salt);
+            byte[] hash = HashPassword(password, Salt);
+            Console.WriteLine($"Hash: {Convert.ToBase64String(hash)}");
+
             /// Compares whether the password hashed is the password the user has.
-            var hashedPassword = HashPassword(password);
-            if (!VerifyPassword(hashedPassword, user.PasswordHash))
+            byte[] hashToVerify = HashPassword(user.PasswordHash, Salt);
+            bool passwordsMatch = hashToVerify.SequenceEqual(hash);
+            if (!passwordsMatch)
                 return (0, false, "");
 
             return (user.UserId, true, user.Role);
         }
 
-        /// Compares whether the password hashed is the password.
-        public bool VerifyPassword(string password, string hash)
+        /// Encrypts the password.
+        public byte[] HashPassword(string password, byte[] salt)
         {
-            return hash == password;
+            var sha256 = new SHA256Managed();
+            byte[] passwordBytes = Encoding.UTF8.GetBytes(password);
+            byte[] passwordAndSaltBytes = new byte[passwordBytes.Length + salt.Length];
+
+            Buffer.BlockCopy(passwordBytes, 0, passwordAndSaltBytes, 0, passwordBytes.Length);
+            Buffer.BlockCopy(salt, 0, passwordAndSaltBytes, passwordBytes.Length, salt.Length);
+
+            return sha256.ComputeHash(passwordAndSaltBytes);
         }
 
-        /// SHA512 encrypts the password.
-        public string HashPassword(string password)
+        /// Converts the password to Base64.
+        public string ToBase(string password)
         {
-            var sha1 = SHA512.Create();
-
-            var hashedBytes = sha1.ComputeHash(Encoding.UTF8.GetBytes(password));
-            var hash = BitConverter.ToString(hashedBytes).Replace("-", "").ToLower();
-
-            return hash;
+            return Convert.ToBase64String(Encoding.UTF8.GetBytes(password));
         }
 
         /// This checks if the user is banned. If they are, they cannot log in.

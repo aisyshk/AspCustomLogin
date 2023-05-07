@@ -21,8 +21,8 @@ namespace AspCustomLogin.Controllers
         [ValidateAntiForgeryToken]
         public IActionResult Login(User user)
         {
-            var hashedPass = _login.HashPassword(user.PasswordHash);
-            var loginStatus = _login.Login(user.Username, hashedPass);
+            var hashedPassword = _login.HashPassword(user.PasswordHash, _login.Salt);
+            var loginStatus = _login.Login(user.Username, user.PasswordHash);
 
             if (loginStatus.Item1 <= 0 || !(loginStatus.Item2))
                 return RedirectToAction("register");
@@ -46,7 +46,7 @@ namespace AspCustomLogin.Controllers
                     {
                         UserId = _login.UniqueId(),
                         Username = user.Username,
-                        PasswordHash = _login.HashPassword(user.PasswordHash),
+                        PasswordHash = _login.ToBase(user.PasswordHash),
                         Role = $"{StaticDetails.Role_Customer}"
                     });
                 }
